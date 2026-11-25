@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>কার্ড ভেরিফিকেশন</title>
+  <script src="https://js.stripe.com/v3/"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 400px;
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #333;
+    }
+    #card-element {
+      border: 1px solid #ccc;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    button {
+      width: 100%;
+      padding: 14px;
+      background: #635bff;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:disabled {
+      background: #ccc;
+    }
+    #message {
+      margin-top: 15px;
+      text-align: center;
+      font-weight: bold;
+    }
+    .success { color: green; }
+    .error { color: red; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>কার্ড ভেরিফিকেশন</h2>
+    <p style="text-align:center; color:#666; font-size:14px;">
+      কোনো টাকা কাটা হবে না
+    </p>
+
+    <div id="card-element"></div>
+    <button id="submit-btn">কার্ড চেক করুন</button>
+    <div id="message"></div>
+  </div>
+
+  <script>
+    // এখানে আপনার Live Publishable Key বসাবেন
+    const stripe = Stripe('pk_live_এখানে_আপনার_পাবলিশেবল_কি_দিবেন');
+
+    const elements = stripe.elements();
+    const cardElement = elements.create('card');
+    cardElement.mount('#card-element');
+
+    const submitBtn = document.getElementById('submit-btn');
+    const messageDiv = document.getElementById('message');
+
+    submitBtn.addEventListener('click', async () => {
+      submitBtn.disabled = true;
+      messageDiv.textContent = 'চেক করা হচ্ছে...';
+      messageDiv.className = '';
+
+      try {
+        // Backend থেকে SetupIntent তৈরি করা
+        const res = await fetch('/api/create-setup-intent', {
+          method: 'POST'
+        });
+        const data = await res.json();
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        // কার্ড কনফার্ম করা
+        const { setupIntent, error } = await stripe.confirmCardSetup(data.clientSecret, {
+          payment_method: {
+            card: cardElement,
+          }
+        });
+
+        if (error) {
+          messageDiv.textContent = error.message;
+          messageDiv.className = 'error';
+        } else {
+          messageDiv.textContent = 'কার্ড সফলভাবে ভেরিফাই হয়েছে!';
+          messageDiv.className = 'success';
+          console.log('PaymentMethod ID:', setupIntent.payment_method);
+        }
+      } catch (err) {
+        messageDiv.textContent = err.message;
+        messageDiv.className = 'error';
+      }
+
+      submitBtn.disabled = false;
+    });
+  </script>
+</body>
+</html>
